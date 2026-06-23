@@ -1,0 +1,33 @@
+{
+  "site": {
+    "base": "https://www.yicare.or.kr",
+    "categoryid": "23",
+    "groupid": "02"
+  },
+  "branches": [
+    { "key": "bojeong",   "name": "보정점",     "menuid": "10", "branch_no": "5", "priority": 1 },
+    { "key": "sanghyeon", "name": "상현점",     "menuid": "02", "branch_no": "2", "priority": 2 },
+    { "key": "sangsang",  "name": "상상의숲점", "menuid": "04", "branch_no": "4", "priority": 3 }
+  ],
+  "report": {
+    "title": "용인 장난감도서관 대여가능 현황",
+    "pages_url": "https://hyeonmini.github.io/lib-toy/"
+  },
+  "notify": {
+    "channel": "imessage",
+    "recipients": [
+      "여기에 내 휴대폰번호 또는 Apple ID (예: +821012345678)",
+      "여기에 아내 휴대폰번호 또는 Apple ID"
+    ]
+  },
+  "enrich": {
+    "max_per_run": 200,
+    "delay_ms": 120
+  },
+  "request": {
+    "delay_ms": 300,
+    "timeout_s": 20,
+    "retries": 3,
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (lib-toy availability watcher)"
+  }
+}

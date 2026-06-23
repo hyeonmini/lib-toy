@@ -1,0 +1,12 @@
+# 개인정보(수신자 번호 등) — 절대 커밋 금지
+config.json
+
+# 런타임 산출물
+data/
+logs/
+*.tmp
+.DS_Store
+
+# 파이썬
+__pycache__/
+*.pyc
