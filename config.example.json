@@ -5,9 +5,27 @@
     "groupid": "02"
   },
   "branches": [
-    { "key": "bojeong",   "name": "보정점",     "menuid": "10", "branch_no": "5", "priority": 1 },
-    { "key": "sanghyeon", "name": "상현점",     "menuid": "02", "branch_no": "2", "priority": 2 },
-    { "key": "sangsang",  "name": "상상의숲점", "menuid": "04", "branch_no": "4", "priority": 3 }
+    {
+      "key": "bojeong",
+      "name": "보정점",
+      "menuid": "10",
+      "branch_no": "5",
+      "priority": 1
+    },
+    {
+      "key": "sanghyeon",
+      "name": "상현점",
+      "menuid": "02",
+      "branch_no": "2",
+      "priority": 2
+    },
+    {
+      "key": "sangsang",
+      "name": "상상의숲점",
+      "menuid": "04",
+      "branch_no": "4",
+      "priority": 3
+    }
   ],
   "report": {
     "title": "용인 장난감도서관 대여가능 현황",
@@ -21,7 +39,7 @@
     ]
   },
   "enrich": {
-    "max_per_run": 200,
+    "max_per_run": 0,
     "delay_ms": 120
   },
   "request": {

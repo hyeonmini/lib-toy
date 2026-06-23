@@ -6,8 +6,11 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LABEL="com.libtoy.report"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+# launchd 자신이 여는 stdout/stderr는 항상 접근 가능한 내장 디스크에 둔다
+# (외장 볼륨이면 launchd가 파일을 못 열어 EX_CONFIG로 실패).
+LOGDIR="$HOME/Library/Logs/libtoy"
 
-mkdir -p "$HOME/Library/LaunchAgents" "$DIR/logs"
+mkdir -p "$HOME/Library/LaunchAgents" "$DIR/logs" "$LOGDIR"
 
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -29,9 +32,9 @@ cat > "$PLIST" <<EOF
         <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>StandardOutPath</key>
-    <string>${DIR}/logs/launchd.out.log</string>
+    <string>${LOGDIR}/launchd.out.log</string>
     <key>StandardErrorPath</key>
-    <string>${DIR}/logs/launchd.err.log</string>
+    <string>${LOGDIR}/launchd.err.log</string>
     <key>ProcessType</key>
     <string>Background</string>
 </dict>
