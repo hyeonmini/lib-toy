@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""data/latest.json → docs/index.html (모바일 우선, 자체 완결형 단일 페이지)."""
+"""data/latest.json → docs/index.html (모바일 우선, 자체 완결형 단일 페이지).
+
+카드 클릭 시 자체 상세 모달(확대 이미지·전체 정보·공식사이트 링크)을 띄운다.
+(공식 사이트는 개별 장난감 딥링크가 없고 상세 API는 CORS 차단이라, 보유 데이터로 모달 구성.)
+"""
 import json
 import os
 import sys
@@ -51,8 +55,10 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
   @media(min-width:820px){ .grid{ grid-template-columns:repeat(4,1fr);} }
   @media(min-width:1080px){ .grid{ grid-template-columns:repeat(5,1fr);} }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
-          overflow:hidden; display:flex; flex-direction:column; }
+          overflow:hidden; display:flex; flex-direction:column; cursor:pointer;
+          text-align:left; padding:0; font:inherit; color:inherit; }
   .card.new { background:var(--new); border-color:var(--newline); }
+  .card:active { transform:scale(0.98); }
   .thumb { width:100%; aspect-ratio:3/4; object-fit:cover; background:#eef0f3;
            display:block; }
   .body { padding:8px 9px 10px; display:flex; flex-direction:column; gap:5px; flex:1; }
@@ -68,6 +74,35 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
            border-radius:6px; padding:2px 6px; align-self:flex-start; }
   .empty { text-align:center; color:var(--muted); padding:60px 20px; }
   footer { text-align:center; font-size:11px; color:var(--muted); padding:20px; }
+  /* 상세 모달 */
+  .modal { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.5);
+           display:none; align-items:flex-end; justify-content:center; }
+  .modal.open { display:flex; }
+  @media(min-width:560px){ .modal{ align-items:center; } }
+  .sheet { background:#fff; width:100%; max-width:480px; max-height:92vh;
+           overflow-y:auto; border-radius:16px 16px 0 0; padding:0 0 24px;
+           position:relative; animation:up .2s ease; }
+  @media(min-width:560px){ .sheet{ border-radius:16px; } }
+  @keyframes up { from{ transform:translateY(20px); opacity:.6 } to{ transform:none; opacity:1 } }
+  .m-x { position:absolute; top:10px; right:10px; z-index:2; width:34px; height:34px;
+         border:none; border-radius:50%; background:rgba(0,0,0,.45); color:#fff;
+         font-size:16px; cursor:pointer; }
+  .m-img { width:100%; max-height:46vh; object-fit:contain; background:#f1f3f5;
+           display:block; border-radius:16px 16px 0 0; }
+  .m-pad { padding:14px 16px 0; }
+  .m-name { font-size:18px; font-weight:700; margin:0 0 8px; line-height:1.35; }
+  .m-badge { display:inline-block; font-size:11px; font-weight:700; color:#fff;
+             background:var(--accent); border-radius:6px; padding:2px 7px; margin-bottom:8px; }
+  .m-dl { display:grid; grid-template-columns:84px 1fr; gap:8px 10px; margin:6px 0 0;
+          font-size:14px; }
+  .m-dl dt { color:var(--muted); }
+  .m-dl dd { margin:0; font-weight:600; }
+  .m-qty { color:var(--ok); }
+  .m-memo { font-size:13px; line-height:1.55; color:#343a40; margin:14px 0 0;
+            white-space:pre-wrap; }
+  .m-btn { display:block; text-align:center; margin:16px 16px 0; padding:12px;
+           background:var(--accent); color:#fff; font-weight:700; border-radius:10px; }
+  .m-note { font-size:11px; color:var(--muted); text-align:center; margin:10px 16px 0; }
 </style>
 </head>
 <body>
@@ -92,12 +127,28 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <footer>용인시육아종합지원센터 장난감도서관 · 데이터 출처: yicare.or.kr<br>
 자동 수집 리포트 · 대여가능(현장) 기준</footer>
 
+<div class="modal" id="modal">
+  <div class="sheet">
+    <button class="m-x" onclick="closeModal()" aria-label="닫기">✕</button>
+    <img class="m-img" id="m-img" alt="" onerror="this.style.visibility='hidden'">
+    <div class="m-pad">
+      <div id="m-badge"></div>
+      <h2 class="m-name" id="m-name"></h2>
+      <dl class="m-dl" id="m-dl"></dl>
+      <p class="m-memo" id="m-memo"></p>
+    </div>
+    <a class="m-btn" id="m-link" target="_blank" rel="noopener">용인 공식사이트에서 보기 →</a>
+    <p class="m-note">개별 장난감 직접 링크가 없어, 공식사이트의 해당 지점 목록으로 이동합니다.</p>
+  </div>
+</div>
+
 <script>
 const DATA = __DATA__;
 let cur = DATA.branches[0].key;
+let shown = [];
 
 const $ = s => document.querySelector(s);
-const tabsEl = $('#tabs'), gridEl = $('#grid');
+const tabsEl = $('#tabs'), gridEl = $('#grid'), modalEl = $('#modal');
 
 function branchByKey(k){ return DATA.branches.find(b=>b.key===k); }
 
@@ -133,14 +184,15 @@ function render(){
     (!newonly || i.is_new));
   if(sort==='name') items=[...items].sort((x,y)=>x.name.localeCompare(y.name,'ko'));
   else if(sort==='qty') items=[...items].sort((x,y)=>y.count-x.count);
+  shown = items;
 
   $('#count').textContent =
     `${b.name} · ${items.length}개 표시` +
     (b.new_count>0?` · 신규 ${b.items.filter(i=>i.is_new).length}개 ⭐`:'');
 
   if(!items.length){ gridEl.innerHTML='<div class="empty">조건에 맞는 장난감이 없어요.</div>'; return; }
-  gridEl.innerHTML = items.map(i=>`
-    <a class="card${i.is_new?' new':''}" href="${b.url}" target="_blank" rel="noopener">
+  gridEl.innerHTML = items.map((i,idx)=>`
+    <button class="card${i.is_new?' new':''}" onclick="openModal(${idx})">
       <img class="thumb" loading="lazy" src="${i.img}" alt="" onerror="this.style.visibility='hidden'">
       <div class="body">
         ${i.is_new?'<span class="badge">신규 ⭐</span>':''}
@@ -151,8 +203,34 @@ function render(){
           <span class="qty">대여가능 ${i.count}</span>
         </div>
       </div>
-    </a>`).join('');
+    </button>`).join('');
 }
+
+function row(dt, dd){ return dd ? `<dt>${dt}</dt><dd>${escapeHtml(String(dd))}</dd>` : ''; }
+
+function openModal(idx){
+  const i = shown[idx]; if(!i) return;
+  const b = branchByKey(cur);
+  $('#m-img').src = i.img;
+  $('#m-img').style.visibility = '';
+  $('#m-name').textContent = i.name;
+  $('#m-badge').innerHTML = i.is_new ? '<span class="m-badge">신규 대여가능 ⭐</span>' : '';
+  $('#m-dl').innerHTML =
+    row('지점', b.name) +
+    row('분류', i.area) +
+    row('추천연령', i.age) +
+    `<dt>대여가능</dt><dd class="m-qty">${i.count}개</dd>` +
+    row('제조사', i.company) +
+    row('구성', i.organ) +
+    row('등록일', i.padate);
+  $('#m-memo').textContent = i.memo || '';
+  $('#m-link').href = b.url;
+  modalEl.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(){ modalEl.classList.remove('open'); document.body.style.overflow=''; }
+modalEl.addEventListener('click', e=>{ if(e.target===modalEl) closeModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 function escapeHtml(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -175,7 +253,6 @@ def build():
         print("data/latest.json 없음 — 먼저 scrape.py 실행 필요", file=sys.stderr)
         return 1
 
-    # 페이지에 필요한 필드만 추림 (용량 최소화)
     slim = {
         "generated_at_human": latest["generated_at_human"],
         "totals": latest["totals"],
@@ -186,6 +263,8 @@ def build():
                 "name": it["name"], "img": it["img"], "area": it["area"],
                 "age": it["age"], "count": it["count"],
                 "is_new": bool(it.get("is_new")),
+                "company": it.get("company", ""), "organ": it.get("organ", ""),
+                "padate": it.get("padate", ""), "memo": it.get("memo", ""),
             } for it in b["items"]],
         } for b in latest["branches"]],
     }
