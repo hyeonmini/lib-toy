@@ -3,7 +3,7 @@
 
 각 지점(보정/상현/상상의숲)의 '대여가능' 장난감 전체를 수집하고,
 직전 실행과 비교해 '신규 대여가능' 델타를 계산한다.
-신규 항목과 일부 미캐시 항목은 상세 API로 풀네임/등록일을 보강하여 캐시한다.
+신규 항목과 일부 미캐시 항목은 상세 API로 풀네임/설명/등록일을 보강하여 캐시한다.
 
 산출물:
   data/latest.json      - 리포트/알림용 최종 스냅샷
@@ -40,6 +40,13 @@ def abs_url(base, src):
 def clean(text):
     text = re.sub(r"<[^>]+>", "", text)
     return html.unescape(text).strip()
+
+
+def clean_memo(text):
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html.unescape(text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def parse_page(html_text, base):
@@ -97,35 +104,52 @@ def scrape_branch(http, cfg, branch):
     return branch_url, all_items
 
 
+def fetch_detail(http, cfg, branch, no, delay):
+    detail_url = cfg["site"]["base"] + "/logic/ajax_getProduct.php"
+    d = http.post_json(detail_url, {
+        "product_no": no, "data_branch_no": branch["branch_no"],
+    }, delay=delay)
+    if not d or d.get("json_flag") != "Y":
+        return None
+    return {
+        "name": clean(str(d.get("product_name") or "")),
+        "company": clean(str(d.get("product_company") or "")),
+        "organ": clean(str(d.get("product_organ") or "")),
+        "padate": str(d.get("product_padate") or ""),
+        "memo": clean_memo(str(d.get("product_memo") or "")),
+        "total": d.get("allTotal"),
+        "catename": clean(str(d.get("str_catename2") or "")),
+    }
+
+
+def merge_detail(it, det):
+    if not det:
+        return
+    if det.get("name"):
+        it["name"] = det["name"]
+    it["company"] = det.get("company", "")
+    it["padate"] = det.get("padate", "")
+    it["organ"] = det.get("organ", "")
+    it["memo"] = det.get("memo", "")
+
+
 def enrich(http, cfg, branch, items, cache):
-    """신규/미캐시 항목 상세 보강. 신규는 항상, 그 외는 한도 내에서."""
-    site = cfg["site"]
-    detail_url = site["base"] + "/logic/ajax_getProduct.php"
+    """신규/미캐시 항목 상세 보강. 신규는 항상, 그 외는 한도 내에서.
+    한도는 환경변수 LIBTOY_ENRICH_CAP로 1회 오버라이드 가능(전체 백필용)."""
     enrich_cfg = cfg.get("enrich", {})
-    cap = enrich_cfg.get("max_per_run", 200)
+    cap = int(os.environ.get("LIBTOY_ENRICH_CAP", enrich_cfg.get("max_per_run", 200)))
     delay = enrich_cfg.get("delay_ms", 120) / 1000.0
     fetched = 0
 
-    def fetch_detail(no):
-        d = http.post_json(detail_url, {
-            "product_no": no, "data_branch_no": branch["branch_no"],
-        }, delay=delay)
-        if not d or d.get("json_flag") != "Y":
-            return None
-        return {
-            "name": clean(str(d.get("product_name") or "")),
-            "company": clean(str(d.get("product_company") or "")),
-            "organ": clean(str(d.get("product_organ") or "")),
-            "padate": str(d.get("product_padate") or ""),
-            "total": d.get("allTotal"),
-            "catename": clean(str(d.get("str_catename2") or "")),
-        }
+    def need(it):
+        det = cache.get(f"{branch['key']}:{it['no']}")
+        return (det is None) or ("memo" not in det)
 
     # 1) 신규 항목은 무조건 보강 (개수 적음)
     for it in items:
         ck = f"{branch['key']}:{it['no']}"
-        if it.get("is_new") and ck not in cache:
-            det = fetch_detail(it["no"])
+        if it.get("is_new") and need(it):
+            det = fetch_detail(http, cfg, branch, it["no"], delay)
             if det:
                 cache[ck] = det
                 fetched += 1
@@ -134,23 +158,17 @@ def enrich(http, cfg, branch, items, cache):
         if fetched >= cap:
             break
         ck = f"{branch['key']}:{it['no']}"
-        if ck not in cache:
-            det = fetch_detail(it["no"])
+        if need(it):
+            det = fetch_detail(http, cfg, branch, it["no"], delay)
             if det:
                 cache[ck] = det
                 fetched += 1
     # 3) 캐시된 풀네임/메타 병합
     for it in items:
-        ck = f"{branch['key']}:{it['no']}"
-        det = cache.get(ck)
-        if det:
-            if det.get("name"):
-                it["name"] = det["name"]
-            it["company"] = det.get("company", "")
-            it["padate"] = det.get("padate", "")
-            it["organ"] = det.get("organ", "")
-            if det.get("catename"):
-                it["area"] = it["area"] or det["catename"]
+        merge_detail(it, cache.get(f"{branch['key']}:{it['no']}"))
+        det = cache.get(f"{branch['key']}:{it['no']}")
+        if det and det.get("catename") and not it.get("area"):
+            it["area"] = det["catename"]
     return fetched
 
 
