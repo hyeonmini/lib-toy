@@ -62,21 +62,23 @@
            border-radius:6px; padding:2px 6px; align-self:flex-start; }
   .empty { text-align:center; color:var(--muted); padding:60px 20px; }
   footer { text-align:center; font-size:11px; color:var(--muted); padding:20px; }
-  /* 상세 모달 (컴팩트·중앙) */
+  /* 상세 모달 — 모바일: 컴팩트 중앙 / PC: 이미지+정보 2단 와이드 */
   .modal { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.55);
            display:none; align-items:center; justify-content:center; padding:18px; }
   .modal.open { display:flex; }
-  .sheet { background:#fff; width:100%; max-width:330px; max-height:76vh;
-           overflow-y:auto; border-radius:16px; padding:0 0 14px;
-           position:relative; animation:pop .16s ease; }
+  .sheet { background:#fff; width:100%; max-width:330px; max-height:80vh;
+           overflow-y:auto; border-radius:16px; position:relative;
+           animation:pop .16s ease; }
   @keyframes pop { from{ transform:scale(.92); opacity:0 } to{ transform:none; opacity:1 } }
   .m-x { position:absolute; top:8px; right:8px; z-index:2; width:42px; height:42px;
          border:none; border-radius:50%; background:rgba(0,0,0,.6); color:#fff;
          font-size:21px; line-height:42px; text-align:center; cursor:pointer; padding:0; }
-  .m-img { width:100%; max-height:26vh; object-fit:contain; background:#f1f3f5;
-           display:block; border-radius:16px 16px 0 0; }
+  .m-media { background:#f1f3f5; border-radius:16px 16px 0 0; overflow:hidden; }
+  .m-img { width:100%; max-height:26vh; object-fit:contain; display:block; }
+  .m-content { padding-bottom:14px; }
   .m-pad { padding:11px 14px 0; }
-  .m-name { font-size:15px; font-weight:700; margin:0 0 6px; line-height:1.3; }
+  .m-name { font-size:15px; font-weight:700; margin:0 0 6px; line-height:1.3;
+            padding-right:34px; }
   .m-badge { display:inline-block; font-size:11px; font-weight:700; color:#fff;
              background:var(--accent); border-radius:6px; padding:2px 7px; margin-bottom:6px; }
   .m-dl { display:grid; grid-template-columns:70px 1fr; gap:5px 10px; margin:3px 0 0;
@@ -89,6 +91,22 @@
   .m-btn { display:block; text-align:center; margin:11px 14px 0; padding:11px;
            background:var(--accent); color:#fff; font-weight:700; border-radius:10px; font-size:14px; }
   .m-note { font-size:11px; color:var(--muted); text-align:center; margin:8px 14px 0; }
+  @media(min-width:620px){
+    .modal { padding:32px; }
+    .sheet { max-width:780px; max-height:82vh; display:flex; overflow:hidden;
+             border-radius:18px; }
+    .m-media { flex:0 0 340px; border-radius:18px 0 0 18px; display:flex;
+               align-items:center; justify-content:center; }
+    .m-img { max-height:82vh; }
+    .m-content { flex:1; min-width:0; overflow-y:auto; padding-bottom:20px; }
+    .m-pad { padding:24px 24px 0; }
+    .m-name { font-size:21px; margin:0 0 14px; padding-right:40px; }
+    .m-badge { font-size:12px; margin-bottom:10px; }
+    .m-dl { grid-template-columns:92px 1fr; gap:9px 14px; font-size:14.5px; }
+    .m-memo { font-size:14px; line-height:1.65; margin:18px 0 0; }
+    .m-btn { font-size:15px; padding:13px; margin:20px 24px 0; }
+    .m-note { margin:12px 24px 0; }
+  }
 </style>
 </head>
 <body>
@@ -116,15 +134,17 @@
 <div class="modal" id="modal">
   <div class="sheet">
     <button class="m-x" onclick="closeModal()" aria-label="닫기">✕</button>
-    <img class="m-img" id="m-img" alt="" onerror="this.style.visibility='hidden'">
-    <div class="m-pad">
-      <div id="m-badge"></div>
-      <h2 class="m-name" id="m-name"></h2>
-      <dl class="m-dl" id="m-dl"></dl>
-      <p class="m-memo" id="m-memo"></p>
+    <div class="m-media"><img class="m-img" id="m-img" alt="" onerror="this.style.visibility='hidden'"></div>
+    <div class="m-content">
+      <div class="m-pad">
+        <div id="m-badge"></div>
+        <h2 class="m-name" id="m-name"></h2>
+        <dl class="m-dl" id="m-dl"></dl>
+        <p class="m-memo" id="m-memo"></p>
+      </div>
+      <a class="m-btn" id="m-link" target="_blank" rel="noopener">용인 공식사이트에서 보기 →</a>
+      <p class="m-note">개별 장난감 직접 링크가 없어, 공식사이트의 해당 지점 목록으로 이동합니다.</p>
     </div>
-    <a class="m-btn" id="m-link" target="_blank" rel="noopener">용인 공식사이트에서 보기 →</a>
-    <p class="m-note">개별 장난감 직접 링크가 없어, 공식사이트의 해당 지점 목록으로 이동합니다.</p>
   </div>
 </div>
 
